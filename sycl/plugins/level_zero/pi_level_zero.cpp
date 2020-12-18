@@ -1113,6 +1113,17 @@ pi_result piDeviceRelease(pi_device Device) {
         zeCommandListDestroy(ZeCommandList);
       }
       Device->ZeCommandListCacheMutex.unlock();
+
+      // We need to deallocate Device from PiDeviceCache to avoid memory leak.
+      auto it = std::find_if(Device->Platform->PiDevicesCache.begin(),
+                            Device->Platform->PiDevicesCache.end(),
+                            [&](std::unique_ptr<_pi_device> &D) {
+                           return D.get() == Device;
+                         });
+      if (it != Device->Platform->PiDevicesCache.end()) {
+	Device->Platform->PiDevicesCache.erase(it);
+      }
+
       delete Device;
     }
   }
