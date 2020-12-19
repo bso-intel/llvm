@@ -11,6 +11,7 @@
 ///
 /// \ingroup sycl_pi_level_zero
 
+#include "pi_global_handler.hpp"
 #include "pi_level_zero.hpp"
 #include <algorithm>
 #include <cstdarg>
@@ -169,6 +170,29 @@ private:
 };
 
 } // anonymous namespace
+
+static std::vector<pi_platform> &PiPlatformsCache = GlobalHandler::instance().getPiPlatformsCache();
+static std::mutex PiPlatformsCacheMutex;
+
+template <class To, class From> To pi_cast(From Value) {
+  // TODO: see if more sanity checks are possible.
+  assert(sizeof(From) == sizeof(To));
+  return (To)(Value);
+}
+
+template <> uint32_t pi_cast(uint64_t Value) {
+  // Cast value and check that we don't lose any information.
+  uint32_t CastedValue = (uint32_t)(Value);
+  assert((uint64_t)CastedValue == Value);
+  return CastedValue;
+}
+
+// TODO: Currently die is defined in each plugin. Probably some
+// common header file with utilities should be created.
+[[noreturn]] void die(const char *Message) {
+  std::cerr << "die: " << Message << std::endl;
+  std::terminate();
+}
 
 // TODO:: In the following 4 methods we may want to distinguish read access vs.
 // write (as it is OK for multiple threads to read the map without locking it).
@@ -811,11 +835,9 @@ pi_result piPlatformsGet(pi_uint32 NumEntries, pi_platform *Platforms,
   // runtime from a global destructor, and such a call could eventually
   // access these variables. Therefore, there is no safe time when
   // "PiPlatformsCache" and "PiPlatformsCacheMutex" could be deleted.
-  static auto PiPlatformsCache = new std::vector<pi_platform>;
-  static auto PiPlatformsCacheMutex = new std::mutex;
   static bool PiPlatformCachePopulated = false;
 
-  std::lock_guard<std::mutex> Lock(*PiPlatformsCacheMutex);
+  std::lock_guard<std::mutex> Lock(PiPlatformsCacheMutex);
   if (!PiPlatformCachePopulated) {
     const char *CommandListCacheSize =
         std::getenv("SYCL_PI_LEVEL_ZERO_MAX_COMMAND_LIST_CACHE");
@@ -867,7 +889,7 @@ pi_result piPlatformsGet(pi_uint32 NumEntries, pi_platform *Platforms,
 
         Platform->ZeMaxCommandListCache = CommandListCacheSizeValue;
         // Save a copy in the cache for future uses.
-        PiPlatformsCache->push_back(Platform);
+        PiPlatformsCache.push_back(Platform);
         PiPlatformCachePopulated = true;
       }
     } catch (const std::bad_alloc &) {
@@ -879,7 +901,7 @@ pi_result piPlatformsGet(pi_uint32 NumEntries, pi_platform *Platforms,
 
   if (Platforms && NumEntries > 0) {
     uint32_t I = 0;
-    for (const pi_platform &CachedPlatform : *PiPlatformsCache) {
+    for (const pi_platform &CachedPlatform : PiPlatformsCache) {
       if (I < NumEntries) {
         *Platforms++ = CachedPlatform;
         I++;
@@ -890,7 +912,7 @@ pi_result piPlatformsGet(pi_uint32 NumEntries, pi_platform *Platforms,
   }
 
   if (NumPlatforms)
-    *NumPlatforms = PiPlatformsCache->size();
+    *NumPlatforms = PiPlatformsCache.size();
 
   return PI_SUCCESS;
 }

@@ -95,6 +95,8 @@ include_directories(${OPENCL_INCLUDE})
 
 add_library(pi_level_zero SHARED
   "${sycl_inc_dir}/CL/sycl/detail/pi.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/pi_global_handler.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/pi_global_handler.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/pi_level_zero.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/pi_level_zero.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/usm_allocator.cpp"

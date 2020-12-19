@@ -34,26 +34,6 @@
 
 #include "usm_allocator.hpp"
 
-template <class To, class From> To pi_cast(From Value) {
-  // TODO: see if more sanity checks are possible.
-  assert(sizeof(From) == sizeof(To));
-  return (To)(Value);
-}
-
-template <> uint32_t pi_cast(uint64_t Value) {
-  // Cast value and check that we don't lose any information.
-  uint32_t CastedValue = (uint32_t)(Value);
-  assert((uint64_t)CastedValue == Value);
-  return CastedValue;
-}
-
-// TODO: Currently die is defined in each plugin. Probably some
-// common header file with utilities should be created.
-[[noreturn]] void die(const char *Message) {
-  std::cerr << "die: " << Message << std::endl;
-  std::terminate();
-}
-
 // Base class to store common data
 struct _pi_object {
   _pi_object() : RefCount{1} {}
