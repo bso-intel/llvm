@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20.0)
-
+add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
 if(NOT DEFINED LLVM_COMMON_CMAKE_UTILS)
   set(LLVM_COMMON_CMAKE_UTILS ${CMAKE_CURRENT_SOURCE_DIR}/../cmake)
 endif()

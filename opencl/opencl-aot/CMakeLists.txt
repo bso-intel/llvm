@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-
+add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
 set(LLVM_LINK_COMPONENTS
         ${LLVM_TARGETS_TO_BUILD}
         Support
