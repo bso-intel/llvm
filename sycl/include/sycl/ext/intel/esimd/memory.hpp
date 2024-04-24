@@ -2753,26 +2753,57 @@ template <typename T, int NElts, lsc_data_size DS, typename PropertyListT,
           typename Toffset>
 __ESIMD_API std::enable_if_t<std::is_integral_v<Toffset>>
 prefetch_impl(const T *p, Toffset offset, simd_mask<1> pred) {
-  check_lsc_vector_size<NElts>();
   check_lsc_data_size<T, DS>();
   check_cache_hints<cache_action::prefetch, PropertyListT>();
+
+  constexpr size_t Alignment =
+      detail::getPropertyValue<PropertyListT, alignment_key>(sizeof(T));
+  static_assert(
+      (Alignment >= __ESIMD_DNS::OperandSize::DWORD && sizeof(T) <= 4) ||
+          (Alignment >= __ESIMD_DNS::OperandSize::QWORD && sizeof(T) > 4),
+      "Incorrect alignment for the data type");
+
+  constexpr int SmallIntFactor64Bit = sizeof(uint64_t) / sizeof(T);
+  constexpr int SmallIntFactor32Bit =
+      sizeof(uint32_t) / sizeof(T) > 1 ? sizeof(uint32_t) / sizeof(T) : 1;
+  static_assert(NElts > 0 && NElts % SmallIntFactor32Bit == 0,
+                "Number of elements is not supported by Transposed load");
+
+  // If alignment >= 8 and (NElts * sizeof(T)) % 8 == 0) we can prefetch QWORDs.
+  // Don't do it for 4-byte vectors (unless it is greater than 256-bytes),
+  // because it would require a bit-cast, which is supposed to be NO-OP, but
+  // might confuse GPU BE sometimes. 1- and 2-byte vectors are casted anyways.
+  constexpr bool Use64BitData =
+      Alignment >= __ESIMD_DNS::OperandSize::QWORD &&
+      (NElts * sizeof(T)) % sizeof(uint64_t) == 0 &&
+      (sizeof(T) != sizeof(uint32_t) || NElts * sizeof(T) > 256);
+  constexpr int SmallIntFactor =
+      Use64BitData ? SmallIntFactor64Bit : SmallIntFactor32Bit;
+  constexpr int FactoredNElts = NElts / SmallIntFactor;
+  check_lsc_vector_size<FactoredNElts>();
+
+  // Prepare template arguments for the call of intrinsic.
+  using LoadElemT = __ESIMD_DNS::__raw_t<
+      std::conditional_t<SmallIntFactor == 1, T,
+                         std::conditional_t<Use64BitData, uint64_t, uint32_t>>>;
+
   constexpr auto L1H = getCacheHintForIntrin<PropertyListT, cache_level::L1>();
   constexpr auto L2H = getCacheHintForIntrin<PropertyListT, cache_level::L2>();
   constexpr uint16_t AddressScale = 1;
   constexpr int ImmOffset = 0;
-  constexpr lsc_data_size EDS = finalize_data_size<T, DS>();
+  constexpr lsc_data_size EDS = finalize_data_size<LoadElemT, DS>();
 
   static_assert(
       EDS == lsc_data_size::u32 || EDS == lsc_data_size::u64,
       "Transposed prefetch is supported only for data size u32 or u64");
-  constexpr lsc_vector_size LSCVS = to_lsc_vector_size<NElts>();
+  constexpr lsc_vector_size LSCVS = to_lsc_vector_size<FactoredNElts>();
   constexpr lsc_data_order Transposed = lsc_data_order::transpose;
   constexpr int N = 1;
 
   simd<uintptr_t, N> addrs = reinterpret_cast<uintptr_t>(p) + offset;
-  __esimd_lsc_prefetch_stateless<T, L1H, L2H, AddressScale, ImmOffset, EDS,
-                                 LSCVS, Transposed, N>(pred.data(),
-                                                       addrs.data());
+  __esimd_lsc_prefetch_stateless<LoadElemT, L1H, L2H, AddressScale, ImmOffset,
+                                 EDS, LSCVS, Transposed, N>(pred.data(),
+                                                            addrs.data());
 }
 
 #ifndef __ESIMD_FORCE_STATELESS_MEM
@@ -2851,24 +2882,54 @@ prefetch_impl(AccessorTy acc, OffsetT byte_offset, simd_mask<1> pred) {
                 "Implicit truncation of 64-bit byte_offset to 32-bit is "
                 "disabled. Use -fsycl-esimd-force-stateless-mem or explicitly "
                 "convert offsets to a 32-bit vector");
-  check_lsc_vector_size<NElts>();
   check_lsc_data_size<T, DS>();
   check_cache_hints<cache_action::prefetch, PropertyListT>();
+
+  constexpr size_t Alignment =
+      detail::getPropertyValue<PropertyListT, alignment_key>(sizeof(T));
+
+  constexpr int SmallIntFactor64Bit = sizeof(uint64_t) / sizeof(T);
+  constexpr int SmallIntFactor32Bit =
+      sizeof(uint32_t) / sizeof(T) > 1 ? sizeof(uint32_t) / sizeof(T) : 1;
+  static_assert(NElts > 0 && NElts % SmallIntFactor32Bit == 0,
+                "Number of elements is not supported by Transposed load");
+
+  // If alignment >= 8 and (NElts * sizeof(T)) % 8 == 0) we can load QWORDs.
+  // Don't do it for 4-byte vectors (unless it is greater than 256-bytes),
+  // because it would require a bit-cast, which is supposed to be NO-OP, but
+  // might confuse GPU BE sometimes. 1- and 2-byte vectors are casted anyways.
+  constexpr bool Use64BitData =
+      Alignment >= __ESIMD_DNS::OperandSize::QWORD &&
+      (NElts * sizeof(T)) % sizeof(uint64_t) == 0 &&
+      (sizeof(T) != sizeof(uint32_t) || NElts * sizeof(T) > 256);
+  constexpr int SmallIntFactor =
+      Use64BitData ? SmallIntFactor64Bit : SmallIntFactor32Bit;
+  constexpr int FactoredNElts = NElts / SmallIntFactor;
+  check_lsc_vector_size<FactoredNElts>();
+
+  // Prepare template arguments for the call of intrinsic.
+  using LoadElemT = __ESIMD_DNS::__raw_t<
+      std::conditional_t<SmallIntFactor == 1, T,
+                         std::conditional_t<Use64BitData, uint64_t, uint32_t>>>;
+
   constexpr auto L1H = getCacheHintForIntrin<PropertyListT, cache_level::L1>();
   constexpr auto L2H = getCacheHintForIntrin<PropertyListT, cache_level::L2>();
   constexpr uint16_t AddressScale = 1;
   constexpr int ImmOffset = 0;
-  constexpr lsc_data_size EDS = finalize_data_size<T, DS>();
+  constexpr lsc_data_size EDS = finalize_data_size<LoadElemT, DS>();
+
   static_assert(
       EDS == lsc_data_size::u32 || EDS == lsc_data_size::u64,
       "Transposed prefetch is supported only for data size u32 or u64");
-  constexpr lsc_vector_size LSCVS = to_lsc_vector_size<NElts>();
+  constexpr lsc_vector_size LSCVS = to_lsc_vector_size<FactoredNElts>();
   constexpr lsc_data_order Transposed = lsc_data_order::transpose;
   constexpr int N = 1;
+
   simd<uint32_t, N> offsets = byte_offset;
   auto SI = get_surface_index(acc);
-  __esimd_lsc_prefetch_bti<T, L1H, L2H, AddressScale, ImmOffset, EDS, LSCVS,
-                           Transposed, N>(pred.data(), offsets.data(), SI);
+  __esimd_lsc_prefetch_bti<LoadElemT, L1H, L2H, AddressScale, ImmOffset, EDS,
+                           LSCVS, Transposed, N>(pred.data(), offsets.data(),
+                                                 SI);
 }
 #endif // __ESIMD_FORCE_STATELESS_MEM
 
@@ -5862,8 +5923,8 @@ __ESIMD_API simd<T, N> slm_atomic_update_impl(simd<uint32_t, N> offsets,
 template <atomic_op Op, typename T, int N>
 __ESIMD_API std::enable_if_t<__ESIMD_DNS::get_num_args<Op>() == 0, simd<T, N>>
 slm_atomic_update(simd<uint32_t, N> byte_offset, simd_mask<N> mask = 1) {
-  // 2 byte, 8 byte types, non-power of two, and operations wider than 32 are
-  // supported only by LSC.
+  // 2 byte, 8 byte types, non-power of two, and operations wider than
+  // 32 are supported only by LSC.
   if constexpr (sizeof(T) == 2 || sizeof(T) == 8 ||
                 !__ESIMD_DNS::isPowerOf2(N, 32)) {
     return slm_atomic_update_impl<Op, T, N,
@@ -5942,8 +6003,8 @@ template <atomic_op Op, typename T, int N>
 __ESIMD_API std::enable_if_t<__ESIMD_DNS::get_num_args<Op>() == 1, simd<T, N>>
 slm_atomic_update(simd<uint32_t, N> byte_offset, simd<T, N> src0,
                   simd_mask<N> mask = 1) {
-  // 2 byte, 8 byte types, non-power of two, and operations wider than 32 are
-  // supported only by LSC.
+  // 2 byte, 8 byte types, non-power of two, and operations wider than
+  // 32 are supported only by LSC.
   if constexpr (sizeof(T) == 2 || sizeof(T) == 8 ||
                 !__ESIMD_DNS::isPowerOf2(N, 32)) {
     // half and short are supported in LSC.
@@ -6031,8 +6092,8 @@ template <atomic_op Op, typename T, int N>
 __ESIMD_API std::enable_if_t<__ESIMD_DNS::get_num_args<Op>() == 2, simd<T, N>>
 slm_atomic_update(simd<uint32_t, N> byte_offset, simd<T, N> src0,
                   simd<T, N> src1, simd_mask<N> mask = 1) {
-  // 2 byte, 8 byte types, non-power of two, and operations wider than 32 are
-  // supported only by LSC.
+  // 2 byte, 8 byte types, non-power of two, and operations wider than
+  // 32 are supported only by LSC.
   if constexpr (sizeof(T) == 2 || sizeof(T) == 8 ||
                 !__ESIMD_DNS::isPowerOf2(N, 32)) {
     // 2-argument lsc_atomic_update arguments order matches the standard one -
@@ -6417,7 +6478,7 @@ atomic_update(T *p, simd<Toffset, N> byte_offset, simd_mask<N> mask,
   static_assert(std::is_integral_v<Toffset>, "Unsupported offset type");
 
   if constexpr (detail::has_cache_hints<PropertyListT>() ||
-                !__ESIMD_DNS::isPowerOf2(N, 32)) {
+                !__ESIMD_DNS::isPowerOf2(N, 32) || sizeof(T) < 4) {
     return detail::atomic_update_impl<
         Op, T, N, detail::lsc_data_size::default_size, PropertyListT, Toffset>(
         p, byte_offset, mask);
@@ -6640,7 +6701,7 @@ atomic_update(T *p, simd<Toffset, N> byte_offset, simd<T, N> src0,
   if constexpr (detail::has_cache_hints<PropertyListT>() ||
                 (Op == atomic_op::fmin) || (Op == atomic_op::fmax) ||
                 (Op == atomic_op::fadd) || (Op == atomic_op::fsub) ||
-                !__ESIMD_DNS::isPowerOf2(N, 32)) {
+                !__ESIMD_DNS::isPowerOf2(N, 32) || sizeof(T) < 4) {
     return detail::atomic_update_impl<
         Op, T, N, detail::lsc_data_size::default_size, PropertyListT, Toffset>(
         p, byte_offset, src0, mask);
@@ -6888,9 +6949,11 @@ atomic_update(T *p, simd<Toffset, N> byte_offset, simd<T, N> src0,
   static_assert(std::is_integral_v<Toffset>, "Unsupported offset type");
 
   // Use LSC atomic when cache hints are present, FP atomics is used,
-  // non-power of two length is used, or operation width greater than 32.
+  // non-power of two length is used, or operation width greater than 32, or the
+  // data size is less than 4 bytes.
   if constexpr (detail::has_cache_hints<PropertyListT>() ||
-                Op == atomic_op::fcmpxchg || !__ESIMD_DNS::isPowerOf2(N, 32)) {
+                Op == atomic_op::fcmpxchg || !__ESIMD_DNS::isPowerOf2(N, 32) ||
+                sizeof(T) < 4) {
     // 2-argument lsc_atomic_update arguments order matches the standard one -
     // expected value first, then new value. But atomic_update uses reverse
     // order, hence the src1/src0 swap.
@@ -7116,7 +7179,7 @@ atomic_update(AccessorTy acc, simd<Toffset, N> byte_offset, simd_mask<N> mask,
   static_assert(std::is_integral_v<Toffset>, "Unsupported offset type");
 
   if constexpr (detail::has_cache_hints<PropertyListT>() ||
-                !detail::isPowerOf2(N, 32)) {
+                !detail::isPowerOf2(N, 32) || sizeof(T) < 4) {
     return detail::atomic_update_impl<
         Op, T, N, detail::lsc_data_size::default_size, PropertyListT>(
         acc, byte_offset, mask);
@@ -7384,7 +7447,7 @@ atomic_update(AccessorTy acc, simd<Toffset, N> byte_offset, simd<T, N> src0,
   if constexpr (detail::has_cache_hints<PropertyListT>() ||
                 Op == atomic_op::fmin || Op == atomic_op::fmax ||
                 Op == atomic_op::fadd || Op == atomic_op::fsub ||
-                !__ESIMD_DNS::isPowerOf2(N, 32)) {
+                !__ESIMD_DNS::isPowerOf2(N, 32) || sizeof(T) < 4) {
     return detail::atomic_update_impl<
         Op, T, N, detail::lsc_data_size::default_size, PropertyListT>(
         acc, byte_offset, src0, mask);
@@ -7681,9 +7744,11 @@ atomic_update(AccessorTy acc, simd<Toffset, N> byte_offset, simd<T, N> src0,
   static_assert(std::is_integral_v<Toffset>, "Unsupported offset type");
   static_assert(sizeof(Toffset) == 4, "Only 32 bit offset is supported");
   // Use LSC atomic when cache hints are present, FP atomics is used,
-  // non-power of two length is used, or operation width greater than 32.
+  // non-power of two length is used, operation width greater than 32, or the
+  // data size is less than 4 bytes,
   if constexpr (detail::has_cache_hints<PropertyListT>() ||
-                Op == atomic_op::fcmpxchg || !__ESIMD_DNS::isPowerOf2(N, 32)) {
+                Op == atomic_op::fcmpxchg || !__ESIMD_DNS::isPowerOf2(N, 32) ||
+                sizeof(T) < 4) {
     // 2-argument lsc_atomic_update arguments order matches the standard one -
     // expected value first, then new value. But atomic_update uses reverse
     // order, hence the src1/src0 swap.
@@ -8872,6 +8937,16 @@ prefetch(const T *p, OffsetSimdViewT byte_offsets, PropertyListT props = {}) {
 /// Prefetches elements of the type 'T' from continuous memory location
 /// addressed by the base pointer \p p, and offset \p byte_offset and the length
 /// \p VS elements into the cache.
+/// The maximum size of a prefetched block is 512 bytes for PVC and 256 bytes
+/// for ACM (DG2). When sizeof(T) is equal to 8 the address must be 8-byte
+/// aligned. Also, 8-byte alignment is required when the function has to load
+/// more than 256-bytes. In all other cases 4-byte alignment is required. When T
+/// is 1- or 2-byte type the data is treated as 4-byte data. Allowed \c VS
+/// values for 64 bit data are 1, 2, 3, 4, 8, 16, 32, 64. Allowed \c VS values
+/// for 32 bit data are 1, 2, 3, 4, 8, 16, 32, 64, 128. Allowed \c VS values for
+/// 16 bit data are 2, 4, 8, 16, 32, 64, 128, 256. Allowed \c VS values for 8
+/// bit data are 4, 8, 12, 16, 32, 64, 128, 256, 512.
+
 /// @tparam T Element type.
 /// @tparam VS Vector size. It specifies the number of consequent elements to
 /// prefetch.
@@ -8879,8 +8954,7 @@ prefetch(const T *p, OffsetSimdViewT byte_offsets, PropertyListT props = {}) {
 /// @param byte_offset offset from the base address.
 /// @param mask The access mask. If it is set to 0, then the prefetch is
 /// omitted.
-/// @param props The optional compile-time properties. Only cache hint
-/// properties are used.
+/// @param props The optional compile-time properties.
 template <typename T, int VS = 1, typename OffsetT,
           typename PropertyListT =
               ext::oneapi::experimental::detail::empty_properties_t>
@@ -9215,6 +9289,15 @@ prefetch(AccessorT acc, OffsetSimdViewT byte_offsets,
 /// Prefetches elements of the type 'T' from continuous memory location
 /// addressed by the accessor \p acc, and offset \p byte_offset and the length
 /// \p VS elements into the cache.
+/// The maximum size of prefetched block is 512 bytes for PVC and 256 bytes for
+/// ACM (DG2). When sizeof(T) equal to 8 the address must be 8-byte aligned.
+/// Also, 8-bytes alignment is required when the function has to load more than
+/// 256-bytes. In all other cases 4-byte alignment is required. When T is 1- or
+/// 2-byte type the data is treated as 4-byte data. Allowed \c VS values for
+/// 64 bit data are 1, 2, 3, 4, 8, 16, 32, 64. Allowed \c VS values for 32
+/// bit data are 1, 2, 3, 4, 8, 16, 32, 64, 128. Allowed \c VS values for 16
+/// bit data are 2, 4, 8, 16, 32, 64, 128, 256. Allowed \c VS values for 8
+/// bit data are 4, 8, 12, 16, 32, 64, 128, 256, 512.
 /// @tparam T Element type.
 /// @tparam VS Vector size. It specifies the number of consequent elements to
 /// prefetch.
@@ -9222,8 +9305,7 @@ prefetch(AccessorT acc, OffsetSimdViewT byte_offsets,
 /// @param byte_offset offset from the base address.
 /// @param mask The access mask. If it is set to 0, then the prefetch is
 /// omitted.
-/// @param props The optional compile-time properties. Only cache hint
-/// properties are used.
+/// @param props The optional compile-time properties.
 template <typename T, int VS = 1, typename AccessorT, typename OffsetT,
           typename PropertyListT =
               ext::oneapi::experimental::detail::empty_properties_t>

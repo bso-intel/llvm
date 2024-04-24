@@ -95,13 +95,13 @@ if(SYCL_PI_UR_USE_FETCH_CONTENT)
   endfunction()
 
   set(UNIFIED_RUNTIME_REPO "https://github.com/oneapi-src/unified-runtime.git")
-  # commit a7c202b49aff130f60da0c03916d08bb22b91aa0
-  # Merge: f85e2e96 e548dc1e
-  # Author: Martin Grant <martin.morrisongrant@codeplay.com>
-  # Date:   Mon Apr 8 15:58:32 2024 +0100
-  #    Merge pull request #1493 from martygrant/martin/fixCoverityCTSErrors
-  #    [CTS] Fix Coverity warning: Add a & before auto so object is not copied unnecessarily
-  set(UNIFIED_RUNTIME_TAG a7c202b49aff130f60da0c03916d08bb22b91aa0)
+  # commit b37fa2c4b09a49839a83228f687c811595fce3fd
+  # Merge: c7fade0d f61e81e9
+  # Author: Kenneth Benzie (Benie) <k.benzie@codeplay.com>
+  # Date:   Tue Apr 23 16:17:41 2024 +0100
+  #    Merge pull request #1544 from kbenzie/benie/l0-fix-rhel-error
+  #    [L0] Add missing <iomanip> include
+  set(UNIFIED_RUNTIME_TAG b37fa2c4b09a49839a83228f687c811595fce3fd)
 
   fetch_adapter_source(level_zero
     ${UNIFIED_RUNTIME_REPO}
@@ -110,13 +110,7 @@ if(SYCL_PI_UR_USE_FETCH_CONTENT)
 
   fetch_adapter_source(opencl
     ${UNIFIED_RUNTIME_REPO}
-    # commit 85b7559033e329389452cb87615ad42fbb644d59 (HEAD -> main, origin/main, origin/HEAD)
-    # Merge: a7c202b4 5c300799
-    # Author: Kenneth Benzie (Benie) <k.benzie@codeplay.com>
-    # Date:   Tue Apr 9 14:06:49 2024 +0100
-    #     Merge pull request #1496 from steffenlarsen/steffen/revert_memory_lookup_error
-    #     [OpenCL] Revert urMemBufferCreate extension function lookup error
-    85b7559033e329389452cb87615ad42fbb644d59
+    ${UNIFIED_RUNTIME_TAG}
   )
 
   fetch_adapter_source(cuda
