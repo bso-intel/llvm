@@ -95,13 +95,13 @@ if(SYCL_PI_UR_USE_FETCH_CONTENT)
   endfunction()
 
   set(UNIFIED_RUNTIME_REPO "https://github.com/oneapi-src/unified-runtime.git")
-  # commit b37fa2c4b09a49839a83228f687c811595fce3fd
-  # Merge: c7fade0d f61e81e9
+  # commit 1906ce76c9c2d2112584cc0679c25f00c4935e73
+  # Merge: 3e3d8748 7f9b30f6
   # Author: Kenneth Benzie (Benie) <k.benzie@codeplay.com>
-  # Date:   Tue Apr 23 16:17:41 2024 +0100
-  #    Merge pull request #1544 from kbenzie/benie/l0-fix-rhel-error
-  #    [L0] Add missing <iomanip> include
-  set(UNIFIED_RUNTIME_TAG b37fa2c4b09a49839a83228f687c811595fce3fd)
+  # Date:   Tue Apr 30 11:25:19 2024 +0100
+  #     Merge pull request #1452 from jinge90/omp_device_global_intercept
+  #     [ASAN] Intercept urProgramLink in sanitizer layer
+  set(UNIFIED_RUNTIME_TAG 1906ce76c9c2d2112584cc0679c25f00c4935e73)
 
   fetch_adapter_source(level_zero
     ${UNIFIED_RUNTIME_REPO}
