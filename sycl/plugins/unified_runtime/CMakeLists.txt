@@ -95,13 +95,13 @@ if(SYCL_PI_UR_USE_FETCH_CONTENT)
   endfunction()
 
   set(UNIFIED_RUNTIME_REPO "https://github.com/oneapi-src/unified-runtime.git")
-  # commit 3b7f35b1907d1acd35204c6d9472037383566a33
-  # Merge: 65c39c8a 3ec0dde6
+  # commit 85771876a5c2a13e3b24c048f0c0d81720d47ccc
+  # Merge: 42d72b66 00edaab9
   # Author: Kenneth Benzie (Benie) <k.benzie@codeplay.com>
-  # Date:   Fri May 17 09:26:05 2024 +0100
-  #     Merge pull request #1534 from zhaomaosu/config-red-zone-size
-  #     [DeviceSanitizer] Add options to allow user to customize red zone size
-  set(UNIFIED_RUNTIME_TAG 3b7f35b1907d1acd35204c6d9472037383566a33)
+  # Date:   Tue May 21 10:15:03 2024 +0100
+  #     Merge pull request #1401 from ph0b/patch-1
+  #     [UR][L0] Return device version based on DeviceIpVersion
+  set(UNIFIED_RUNTIME_TAG 85771876a5c2a13e3b24c048f0c0d81720d47ccc)
 
   fetch_adapter_source(level_zero
     ${UNIFIED_RUNTIME_REPO}
@@ -115,7 +115,13 @@ if(SYCL_PI_UR_USE_FETCH_CONTENT)
 
   fetch_adapter_source(cuda
     ${UNIFIED_RUNTIME_REPO}
-    ${UNIFIED_RUNTIME_TAG}
+    # commit d3502dc1c1eac924736fc08529e4d5f149648fd1
+    # Merge: c911a9b6 71420060
+    # Author: Kenneth Benzie (Benie) <k.benzie@codeplay.com>
+    # Date:   Wed May 22 10:38:34 2024 +0100
+    #     Merge pull request #1565 from hdelan/cuda-multi-dev-ctx
+    #     [CUDA] CUDA adapter multi device context
+    d3502dc1c1eac924736fc08529e4d5f149648fd1
   )
 
   fetch_adapter_source(hip
