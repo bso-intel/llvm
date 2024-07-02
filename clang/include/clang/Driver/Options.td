@@ -610,6 +610,7 @@ class MarshallingInfoVisibility<KeyPathAndMacro kpm, code default>
 // Key paths that are constant during parsing of options with the same key path prefix.
 defvar cplusplus = LangOpts<"CPlusPlus">;
 defvar cpp11 = LangOpts<"CPlusPlus11">;
+defvar cpp14 = LangOpts<"CPlusPlus14">;
 defvar cpp17 = LangOpts<"CPlusPlus17">;
 defvar cpp20 = LangOpts<"CPlusPlus20">;
 defvar c99 = LangOpts<"C99">;
@@ -3059,6 +3060,10 @@ def fms_compatibility : Flag<["-"], "fms-compatibility">, Group<f_Group>,
   Visibility<[ClangOption, CC1Option, CLOption]>,
   HelpText<"Enable full Microsoft Visual C++ compatibility">,
   MarshallingInfoFlag<LangOpts<"MSVCCompat">>;
+def fms_define_stdc : Flag<["-"], "fms-define-stdc">, Group<f_Group>,
+  Visibility<[ClangOption, CC1Option, CLOption]>,
+  HelpText<"Define '__STDC__' to '1' in MSVC Compatibility mode">,
+  MarshallingInfoFlag<LangOpts<"MSVCEnableStdcMacro">>;
 def fms_extensions : Flag<["-"], "fms-extensions">, Group<f_Group>,
   Visibility<[ClangOption, CC1Option, CLOption]>,
   HelpText<"Accept some non-standard constructs supported by the Microsoft compiler">,
@@ -3473,10 +3478,9 @@ defm relaxed_template_template_args : BoolFOption<"relaxed-template-template-arg
   NegFlag<SetFalse, [], [CC1Option], "Disable">,
   BothFlags<[], [ClangOption], " C++17 relaxed template template argument matching">>;
 defm sized_deallocation : BoolFOption<"sized-deallocation",
-  LangOpts<"SizedDeallocation">, DefaultFalse,
-  PosFlag<SetTrue, [], [ClangOption, CC1Option],
-          "Enable C++14 sized global deallocation functions">,
-  NegFlag<SetFalse>>;
+  LangOpts<"SizedDeallocation">, Default<cpp14.KeyPath>,
+  PosFlag<SetTrue, [], [], "Enable C++14 sized global deallocation functions">,
+  NegFlag<SetFalse>, BothFlags<[], [ClangOption, CC1Option]>>;
 defm aligned_allocation : BoolFOption<"aligned-allocation",
   LangOpts<"AlignedAllocation">, Default<cpp17.KeyPath>,
   PosFlag<SetTrue, [], [ClangOption], "Enable C++17 aligned allocation functions">,
@@ -3512,10 +3516,6 @@ def fobjc_nonfragile_abi : Flag<["-"], "fobjc-nonfragile-abi">, Group<f_Group>;
 def fno_objc_nonfragile_abi : Flag<["-"], "fno-objc-nonfragile-abi">, Group<f_Group>;
 
 def fobjc_sender_dependent_dispatch : Flag<["-"], "fobjc-sender-dependent-dispatch">, Group<f_Group>;
-def foffload_static_lib_EQ : CommaJoined<["-"], "foffload-static-lib=">, Flags<[NoXarchOption]>,
-  Visibility<[ClangOption, CLOption, DXCOption]>, Group<offload_lib_Group>;
-def foffload_whole_static_lib_EQ : CommaJoined<["-"], "foffload-whole-static-lib=">, Flags<[NoXarchOption]>,
-  Visibility<[ClangOption, CLOption, DXCOption]>, Group<offload_lib_Group>;
 def fobjc_disable_direct_methods_for_testing :
   Flag<["-"], "fobjc-disable-direct-methods-for-testing">,
   Group<f_Group>, Visibility<[ClangOption, CC1Option]>,
@@ -3958,14 +3958,6 @@ def fno_sycl_esimd_build_host_code :  Flag<["-"], "fno-sycl-esimd-build-host-cod
 def fsycl_targets_EQ : CommaJoined<["-"], "fsycl-targets=">, Flags<[NoXarchOption]>,
   Visibility<[ClangOption, CLOption, DXCOption, CC1Option]>,
   HelpText<"Specify comma-separated list of triples SYCL offloading targets to be supported">;
-def fsycl_add_targets_EQ : CommaJoined<["-"], "fsycl-add-targets=">,
-  Flags<[NoXarchOption, Deprecated]>, Visibility<[ClangOption, CLOption, DXCOption]>,
-  HelpText<"Specify comma-separated list of triple and device binary image "
-           "pairs to add to the final SYCL binary (deprecated)">;
-def fsycl_link_targets_EQ : CommaJoined<["-"], "fsycl-link-targets=">,
-  Flags<[NoXarchOption, Deprecated]>, Visibility<[ClangOption, CLOption, DXCOption, CC1Option]>,
-  HelpText<"Specify comma-separated list of triples SYCL offloading targets "
-           "to produce linked device images (deprecated)">;
 def fsycl_force_target_EQ : Joined<["-"], "fsycl-force-target=">,
   Flags<[NoXarchOption]>, Visibility<[ClangOption, CLOption, DXCOption]>,
   HelpText<"Force the usage of the given triple when extracting device code "
@@ -4059,6 +4051,10 @@ def fsycl_libspirv_path_EQ : Joined<["-"], "fsycl-libspirv-path=">,
   Visibility<[ClangOption, CLOption, DXCOption, CC1Option]>, HelpText<"Path to libspirv library">;
 def fno_sycl_libspirv : Flag<["-"], "fno-sycl-libspirv">, Visibility<[ClangOption, CLOption, DXCOption]>,
   HelpText<"Disable check for libspirv">;
+def fsycl_use_spirv_backend_for_spirv_gen : Flag<["-"], "fsycl-use-spirv-backend-for-spirv-gen">,
+  Visibility<[ClangOption, CLOption]>, Flags<[HelpHidden]>, HelpText<"Use the SPIR-V backend for SPIR-V code generation. "
+  "Has effect only for SPIR-based targets. It is off by default and "
+  "the SPIR-V LLVM Translator is used for SPIR-V code generation. (experimental)">;
 def fsycl_host_compiler_EQ : Joined<["-"], "fsycl-host-compiler=">,
   Flags<[NoArgumentUnused]>, Visibility<[ClangOption, CLOption, DXCOption]>,
   HelpText<"Specify C++ compiler binary to perform host "
@@ -4086,6 +4082,10 @@ def fsycl_exp_range_rounding : Flag<["-"], "fsycl-exp-range-rounding">,
   Visibility<[ClangOption, CLOption, DXCOption, CC1Option]>,
   HelpText<"Use experimental range rounding.">,
   MarshallingInfoFlag<LangOpts<"SYCLExperimentalRangeRounding">>;
+def fsycl_fp64_conv_emu : Flag<["-"], "fsycl-fp64-conv-emu">,
+  Visibility<[ClangOption, CLOption, CC1Option]>,
+  HelpText<"Enable fp64 partial emulation for kernels with only fp64 conversion operations and no fp64 computation operations (requires Intel GPU backend supporting fp64 partial emulation).">,
+  MarshallingInfoFlag<CodeGenOpts<"FP64ConvEmu">>;
 def fno_sycl_use_footer : Flag<["-"], "fno-sycl-use-footer">, Visibility<[ClangOption, CLOption, DXCOption]>,
   HelpText<"Disable usage of the integration footer during SYCL enabled "
    "compilations.">;
@@ -4719,6 +4719,10 @@ def image__base : Separate<["-"], "image_base">;
 def include_ : JoinedOrSeparate<["-", "--"], "include">, Group<clang_i_Group>, EnumName<"include">,
     MetaVarName<"<file>">, HelpText<"Include file before parsing">,
     Visibility<[ClangOption, CC1Option]>;
+def include_footer : Separate<["-"], "include-footer">, Group<clang_i_Group>,
+    Visibility<[CC1Option]>,
+    HelpText<"Name of the footer integration file">,  MetaVarName<"<file>">,
+    MarshallingInfoString<PreprocessorOpts<"IncludeFooter">>;
 def include_pch : Separate<["-"], "include-pch">, Group<clang_i_Group>,
   Visibility<[ClangOption, CC1Option]>,
   HelpText<"Include precompiled header file">, MetaVarName<"<file>">,
@@ -6409,14 +6413,10 @@ def mavx512cd : Flag<["-"], "mavx512cd">, Group<m_x86_Features_Group>;
 def mno_avx512cd : Flag<["-"], "mno-avx512cd">, Group<m_x86_Features_Group>;
 def mavx512dq : Flag<["-"], "mavx512dq">, Group<m_x86_Features_Group>;
 def mno_avx512dq : Flag<["-"], "mno-avx512dq">, Group<m_x86_Features_Group>;
-def mavx512er : Flag<["-"], "mavx512er">, Group<m_x86_Features_Group>;
-def mno_avx512er : Flag<["-"], "mno-avx512er">, Group<m_x86_Features_Group>;
 def mavx512fp16 : Flag<["-"], "mavx512fp16">, Group<m_x86_Features_Group>;
 def mno_avx512fp16 : Flag<["-"], "mno-avx512fp16">, Group<m_x86_Features_Group>;
 def mavx512ifma : Flag<["-"], "mavx512ifma">, Group<m_x86_Features_Group>;
 def mno_avx512ifma : Flag<["-"], "mno-avx512ifma">, Group<m_x86_Features_Group>;
-def mavx512pf : Flag<["-"], "mavx512pf">, Group<m_x86_Features_Group>;
-def mno_avx512pf : Flag<["-"], "mno-avx512pf">, Group<m_x86_Features_Group>;
 def mavx512vbmi : Flag<["-"], "mavx512vbmi">, Group<m_x86_Features_Group>;
 def mno_avx512vbmi : Flag<["-"], "mno-avx512vbmi">, Group<m_x86_Features_Group>;
 def mavx512vbmi2 : Flag<["-"], "mavx512vbmi2">, Group<m_x86_Features_Group>;
@@ -6507,8 +6507,6 @@ def mpopcnt : Flag<["-"], "mpopcnt">, Group<m_x86_Features_Group>;
 def mno_popcnt : Flag<["-"], "mno-popcnt">, Group<m_x86_Features_Group>;
 def mprefetchi : Flag<["-"], "mprefetchi">, Group<m_x86_Features_Group>;
 def mno_prefetchi : Flag<["-"], "mno-prefetchi">, Group<m_x86_Features_Group>;
-def mprefetchwt1 : Flag<["-"], "mprefetchwt1">, Group<m_x86_Features_Group>;
-def mno_prefetchwt1 : Flag<["-"], "mno-prefetchwt1">, Group<m_x86_Features_Group>;
 def mprfchw : Flag<["-"], "mprfchw">, Group<m_x86_Features_Group>;
 def mno_prfchw : Flag<["-"], "mno-prfchw">, Group<m_x86_Features_Group>;
 def mptwrite : Flag<["-"], "mptwrite">, Group<m_x86_Features_Group>;
@@ -6886,6 +6884,10 @@ def flang_experimental_hlfir : Flag<["-"], "flang-experimental-hlfir">,
 def flang_deprecated_no_hlfir : Flag<["-"], "flang-deprecated-no-hlfir">,
   Flags<[HelpHidden]>, Visibility<[FlangOption, FC1Option]>,
   HelpText<"Do not use HLFIR lowering (deprecated)">;
+
+def flang_experimental_integer_overflow : Flag<["-"], "flang-experimental-integer-overflow">,
+  Flags<[HelpHidden]>, Visibility<[FlangOption, FC1Option]>,
+  HelpText<"Add nsw flag to internal operations such as do-variable increment (experimental)">;
 
 //===----------------------------------------------------------------------===//
 // FLangOption + Visibility<[FlangOption, CLOption, DXCOption] + NoXarchOption
@@ -8721,6 +8723,9 @@ def _SLASH_vd : CLJoined<"vd">, HelpText<"Control vtordisp placement">,
   Alias<vtordisp_mode_EQ>;
 def _SLASH_X : CLFlag<"X">,
   HelpText<"Do not add %INCLUDE% to include search path">, Alias<nostdlibinc>;
+def _SLASH_Zc___STDC__ : CLFlag<"Zc:__STDC__">,
+  HelpText<"Define __STDC__">,
+  Alias<fms_define_stdc>;
 def _SLASH_Zc_sizedDealloc : CLFlag<"Zc:sizedDealloc">,
   HelpText<"Enable C++14 sized global deallocation functions">,
   Alias<fsized_deallocation>;

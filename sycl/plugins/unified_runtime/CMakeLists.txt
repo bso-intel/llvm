@@ -75,11 +75,16 @@ if(SYCL_PI_UR_USE_FETCH_CONTENT)
     endif()
     if(repo STREQUAL UNIFIED_RUNTIME_REPO AND
         tag STREQUAL UNIFIED_RUNTIME_TAG)
+      # If the adapter sources are taken from the main checkout, reset the
+      # adapter specific source path.
+      string(TOUPPER ${name} NAME)
+      set(UR_ADAPTER_${NAME}_SOURCE_DIR ""
+        CACHE PATH "Path to external '${name}' adapter source dir" FORCE)
       return()
     endif()
     message(STATUS
       "Will fetch Unified Runtime ${name} adapter from ${repo} at ${tag}")
-    set(fetch-name unified-runtime-${name})
+    set(fetch-name ur-${name})
     FetchContent_Declare(${fetch-name}
       GIT_REPOSITORY ${repo} GIT_TAG ${tag})
     # We don't want to add this repo to the build, only fetch its source.
@@ -95,13 +100,12 @@ if(SYCL_PI_UR_USE_FETCH_CONTENT)
   endfunction()
 
   set(UNIFIED_RUNTIME_REPO "https://github.com/oneapi-src/unified-runtime.git")
-  # commit 3b7f35b1907d1acd35204c6d9472037383566a33
-  # Merge: 65c39c8a 3ec0dde6
-  # Author: Kenneth Benzie (Benie) <k.benzie@codeplay.com>
-  # Date:   Fri May 17 09:26:05 2024 +0100
-  #     Merge pull request #1534 from zhaomaosu/config-red-zone-size
-  #     [DeviceSanitizer] Add options to allow user to customize red zone size
-  set(UNIFIED_RUNTIME_TAG 3b7f35b1907d1acd35204c6d9472037383566a33)
+  # commit aaf08109f2a05adb61f50478824ae2739526daee
+  # Author: Ben Tracy <ben.tracy@codeplay.com>
+  # Date:   Mon Jun 17 14:49:53 2024 +0100
+  #     [CMDBUF] Fix coverity issue in command buffers
+  #     - Fix incorrect conditions for copy engine usage that were reported on coverity.
+  set(UNIFIED_RUNTIME_TAG aaf08109f2a05adb61f50478824ae2739526daee)
 
   fetch_adapter_source(level_zero
     ${UNIFIED_RUNTIME_REPO}
