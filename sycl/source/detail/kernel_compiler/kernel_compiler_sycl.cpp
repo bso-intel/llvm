@@ -28,6 +28,11 @@ spirv_vec_t
 SYCL_to_SPIRV(const std::string &SYCLSource, include_pairs_t IncludePairs,
               const std::vector<std::string> &UserArgs, std::string *LogPtr,
               const std::vector<std::string> &RegisteredKernelNames) {
+  (void)SYCLSource;
+  (void)IncludePairs;
+  (void)UserArgs;
+  (void)LogPtr;
+  (void)RegisteredKernelNames;
   throw sycl::exception(sycl::errc::build,
                         "kernel_compiler does not support GCC<8");
 }
@@ -133,6 +138,7 @@ void outputIncludeFiles(const std::filesystem::path &Dirpath,
   using pairStrings = std::pair<std::string, std::string>;
   for (pairStrings p : IncludePairs) {
     std::filesystem::path FilePath = Dirpath / p.first;
+    std::filesystem::create_directories(FilePath.parent_path());
     std::ofstream outfile(FilePath, std::ios::out | std::ios::trunc);
     if (outfile.is_open()) {
       outfile << p.second << std::endl;

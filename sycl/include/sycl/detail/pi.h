@@ -196,9 +196,17 @@
 // _pi_virtual_mem_granularity_info enum, _pi_virtual_mem_info enum and
 // pi_virtual_access_flags bit flags.
 // 15.55 Added piextEnqueueNativeCommand as well as associated types and enums
+// 16.56 Replaced piextUSMEnqueueMemset with piextUSMEnqueueFill
+// 16.57 Added mappings to UR launch properties extension
+// (piextEnqueueKernelLaunchCustom)
+// 17.58 Added context parameter to piextMemImageGetInfo
+// 17.59 Added const-qualifier to src_ptr in piextMemImageCopy.
+// 18.60 Remove deprecated functions piextMemImportOpaqueFD and
+//       piextImportExternalSemaphoreOpaqueFD
+// 19.61 Rename piextDestroyExternalSemaphore to piextReleaseExternalSemaphore
 
-#define _PI_H_VERSION_MAJOR 15
-#define _PI_H_VERSION_MINOR 55
+#define _PI_H_VERSION_MAJOR 19
+#define _PI_H_VERSION_MINOR 61
 
 #define _PI_STRING_HELPER(a) #a
 #define _PI_CONCAT(a, b) _PI_STRING_HELPER(a.b)
@@ -513,8 +521,12 @@ typedef enum {
 
   // Virtual memory support
   PI_EXT_ONEAPI_DEVICE_INFO_SUPPORTS_VIRTUAL_MEM = 0x2011E,
+
   // Native enqueue
   PI_EXT_ONEAPI_DEVICE_INFO_ENQUEUE_NATIVE_COMMAND_SUPPORT = 0x2011F,
+
+  // Return whether cluster launch is supported by device
+  PI_EXT_ONEAPI_DEVICE_INFO_CLUSTER_LAUNCH = 0x2021,
 } _pi_device_info;
 
 typedef enum {
@@ -1076,6 +1088,8 @@ static const uint8_t PI_DEVICE_BINARY_OFFLOAD_KIND_SYCL = 4;
   "SYCL/device requirements"
 /// PropertySetRegistry::SYCL_HOST_PIPES defined in PropertySetIO.h
 #define __SYCL_PI_PROPERTY_SET_SYCL_HOST_PIPES "SYCL/host pipes"
+/// PropertySetRegistry::SYCL_VIRTUAL_FUNCTIONS defined in PropertySetIO.h
+#define __SYCL_PI_PROPERTY_SET_SYCL_VIRTUAL_FUNCTIONS "SYCL/virtual functions"
 
 /// Program metadata tags recognized by the PI backends. For kernels the tag
 /// must appear after the kernel name.
@@ -1316,8 +1330,28 @@ typedef enum {
           ///< P2P link, otherwise such operations are not supported.
 } _pi_peer_attr;
 
+typedef enum {
+  PI_LAUNCH_PROPERTY_IGNORE = 0x0,
+  PI_LAUNCH_PROPERTY_COOPERATIVE = 0x1,
+  PI_LAUNCH_PROPERTY_CLUSTER_DIMENSION = 0x2,
+} _pi_launch_property_id;
+
+typedef union {
+  int cooperative;
+  int32_t cluster_dims[3];
+} _pi_launch_property_value;
+
 using pi_mem_info = _pi_mem_info;
 using pi_peer_attr = _pi_peer_attr;
+using pi_launch_property_id = _pi_launch_property_id;
+using pi_launch_property_value = _pi_launch_property_value;
+
+typedef struct {
+  pi_launch_property_id id;
+  pi_launch_property_value value;
+} _pi_launch_property;
+
+using pi_launch_property = _pi_launch_property;
 
 //
 // Following section contains SYCL RT Plugin Interface (PI) functions.
@@ -1932,6 +1966,14 @@ __SYCL_EXPORT pi_result piextEnqueueCooperativeKernelLaunch(
     const size_t *local_work_size, pi_uint32 num_events_in_wait_list,
     const pi_event *event_wait_list, pi_event *event);
 
+__SYCL_EXPORT pi_result piextEnqueueKernelLaunchCustom(
+    pi_queue queue, pi_kernel kernel, pi_uint32 work_dim,
+    const size_t *global_work_size, const size_t *local_work_size,
+    pi_uint32 num_props_in_launch_prop_list,
+    const pi_launch_property *launch_prop_list,
+    pi_uint32 num_events_in_wait_list, const pi_event *event_wait_list,
+    pi_event *event);
+
 __SYCL_EXPORT pi_result piEnqueueEventsWait(pi_queue command_queue,
                                             pi_uint32 num_events_in_wait_list,
                                             const pi_event *event_wait_list,
@@ -2174,22 +2216,22 @@ __SYCL_EXPORT pi_result piextUSMPitchedAlloc(
 /// \param ptr is the memory to be freed
 __SYCL_EXPORT pi_result piextUSMFree(pi_context context, void *ptr);
 
-/// USM Memset API
+/// USM Fill API
 ///
 /// \param queue is the queue to submit to
-/// \param ptr is the ptr to memset
-/// \param value is value to set.  It is interpreted as an 8-bit value and the
-/// upper
-///        24 bits are ignored
-/// \param count is the size in bytes to memset
+/// \param ptr is the ptr to fill
+/// \param pattern is the ptr with the bytes of the pattern to set
+/// \param patternSize is the size in bytes of the pattern to set
+/// \param count is the size in bytes to fill
 /// \param num_events_in_waitlist is the number of events to wait on
 /// \param events_waitlist is an array of events to wait on
 /// \param event is the event that represents this operation
-__SYCL_EXPORT pi_result piextUSMEnqueueMemset(pi_queue queue, void *ptr,
-                                              pi_int32 value, size_t count,
-                                              pi_uint32 num_events_in_waitlist,
-                                              const pi_event *events_waitlist,
-                                              pi_event *event);
+__SYCL_EXPORT pi_result piextUSMEnqueueFill(pi_queue queue, void *ptr,
+                                            const void *pattern,
+                                            size_t patternSize, size_t count,
+                                            pi_uint32 num_events_in_waitlist,
+                                            const pi_event *events_waitlist,
+                                            pi_event *event);
 
 /// USM Memcpy API
 ///
@@ -3056,7 +3098,7 @@ __SYCL_EXPORT pi_result piextBindlessImageSamplerCreate(
 /// \param event_wait_list is the list of events to wait on before copying
 /// \param event is the returned event representing this operation
 __SYCL_EXPORT pi_result piextMemImageCopy(
-    pi_queue command_queue, void *dst_ptr, void *src_ptr,
+    pi_queue command_queue, void *dst_ptr, const void *src_ptr,
     const pi_image_format *image_format, const pi_image_desc *image_desc,
     const pi_image_copy_flags flags, pi_image_offset src_offset,
     pi_image_offset dst_offset, pi_image_region copy_extent,
@@ -3065,30 +3107,16 @@ __SYCL_EXPORT pi_result piextMemImageCopy(
 
 /// API to query an image memory handle for specific properties.
 ///
+/// \param context is the handle to the context
 /// \param mem_handle is the handle to the image memory
 /// \param param_name is the queried info name
 /// \param param_value is the returned query value
 /// \param param_value_size_ret is the returned query value size
-__SYCL_EXPORT pi_result piextMemImageGetInfo(
-    const pi_image_mem_handle mem_handle, pi_image_info param_name,
-    void *param_value, size_t *param_value_size_ret);
-
-/// [DEPRECATED] This function is deprecated in favor of
-/// `piextImportExternalMemory`
-///
-/// API to import external memory in the form of a file descriptor.
-///
-/// \param context is the pi_context
-/// \param device is the pi_device
-/// \param size is the size of the external memory
-/// \param file_descriptor is the file descriptor
-/// \param ret_handle is the returned interop memory handle to the external
-/// memory
-__SYCL_EXPORT_DEPRECATED("This function has been deprecated in favor of "
-                         "`piextImportExternalMemory`")
-pi_result piextMemImportOpaqueFD(pi_context context, pi_device device,
-                                 size_t size, int file_descriptor,
-                                 pi_interop_mem_handle *ret_handle);
+__SYCL_EXPORT pi_result piextMemImageGetInfo(pi_context context,
+                                             pi_image_mem_handle mem_handle,
+                                             pi_image_info param_name,
+                                             void *param_value,
+                                             size_t *param_value_size_ret);
 
 /// API to import external memory
 ///
@@ -3124,23 +3152,6 @@ __SYCL_EXPORT pi_result piextMemMapExternalArray(
 __SYCL_EXPORT pi_result piextMemReleaseInterop(
     pi_context context, pi_device device, pi_interop_mem_handle memory_handle);
 
-/// [DEPRECATED] This function is deprecated in favor of
-/// `piextImportExternalSemaphore`
-///
-/// API to import an external semaphore in the form of a file descriptor.
-///
-/// \param context is the pi_context
-/// \param device is the pi_device
-/// \param file_descriptor is the file descriptor
-/// \param ret_handle is the returned interop semaphore handle to the external
-/// semaphore
-__SYCL_EXPORT_DEPRECATED("This function has been deprecated in favor of "
-                         "`piextImportExternalSemaphore`")
-pi_result
-piextImportExternalSemaphoreOpaqueFD(pi_context context, pi_device device,
-                                     int file_descriptor,
-                                     pi_interop_semaphore_handle *ret_handle);
-
 /// API to import an external semaphore
 ///
 /// \param context is the pi_context
@@ -3153,14 +3164,14 @@ piextImportExternalSemaphore(pi_context context, pi_device device,
                              pi_external_semaphore_descriptor *sem_descriptor,
                              pi_interop_semaphore_handle *ret_handle);
 
-/// API to destroy the external semaphore handle.
+/// API to release the external semaphore.
 ///
 /// \param context is the pi_context
 /// \param device is the pi_device
 /// \param sem_handle is the interop semaphore handle to the external semaphore
 /// to be destroyed
 __SYCL_EXPORT pi_result
-piextDestroyExternalSemaphore(pi_context context, pi_device device,
+piextReleaseExternalSemaphore(pi_context context, pi_device device,
                               pi_interop_semaphore_handle sem_handle);
 
 /// API to instruct the queue with a non-blocking wait on an external semaphore.

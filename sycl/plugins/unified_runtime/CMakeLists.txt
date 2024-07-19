@@ -100,12 +100,12 @@ if(SYCL_PI_UR_USE_FETCH_CONTENT)
   endfunction()
 
   set(UNIFIED_RUNTIME_REPO "https://github.com/oneapi-src/unified-runtime.git")
-  # commit aaf08109f2a05adb61f50478824ae2739526daee
-  # Author: Ben Tracy <ben.tracy@codeplay.com>
-  # Date:   Mon Jun 17 14:49:53 2024 +0100
-  #     [CMDBUF] Fix coverity issue in command buffers
-  #     - Fix incorrect conditions for copy engine usage that were reported on coverity.
-  set(UNIFIED_RUNTIME_TAG aaf08109f2a05adb61f50478824ae2739526daee)
+  # commit 0abf37072567c27ff412ea7acfce7b72b9e4b3c0
+  # Author: Kenneth Benzie (Benie) <k.benzie@codeplay.com>
+  # Date:   Wed Jul 17 19:12:31 2024 +0100
+  #     Reinstate "Merge pull request #1855 from Seanst98/sean/rename-external-semaphore-release""
+  #     This reverts commit b26e53cdbd178ee03c3e8252aa00e596deb1f313.
+  set(UNIFIED_RUNTIME_TAG 0abf37072567c27ff412ea7acfce7b72b9e4b3c0)
 
   fetch_adapter_source(level_zero
     ${UNIFIED_RUNTIME_REPO}
@@ -281,7 +281,6 @@ endif()
 if ("native_cpu" IN_LIST SYCL_ENABLE_PLUGINS)
     add_dependencies(sycl-runtime-libraries ur_adapter_native_cpu)
 
-  option(NATIVECPU_USE_OCK "Use the oneAPI Construction Kit for Native CPU" ON)
 
   if(NATIVECPU_USE_OCK)
     message(STATUS "Compiling Native CPU adapter with OCK support.")
