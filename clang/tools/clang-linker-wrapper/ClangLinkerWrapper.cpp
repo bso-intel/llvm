@@ -853,7 +853,6 @@ static void addBackendOptions(const ArgList &Args,
 static Expected<StringRef> runAOTCompileIntelCPU(StringRef InputFile,
                                                  const ArgList &Args) {
   const llvm::Triple Triple(Args.getLastArgValue(OPT_triple_EQ));
-  StringRef Arch(Args.getLastArgValue(OPT_arch_EQ));
   SmallVector<StringRef, 8> CmdArgs;
   Expected<std::string> OpenCLAOTPath =
       findProgram("opencl-aot", {getMainExecutable("opencl-aot")});
@@ -968,10 +967,12 @@ wrapSYCLBinariesFromFile(std::vector<module_split::SplitModule> &SplitModules,
 
   SmallVector<llvm::offloading::SYCLImage> Images;
   // SYCL runtime currently works for spir64 target triple and not for
-  // spir64-unknown-unknown.
-  // TODO: Fix SYCL runtime to accept both triple
+  // spir64-unknown-unknown/spirv64-unknown-unknown/spirv64.
+  // TODO: Fix SYCL runtime to accept other triples
   llvm::Triple T(Target);
   StringRef A(T.getArchName());
+  if(A == "spirv64")
+    A = "spir64";
   for (auto &SI : SplitModules) {
     auto MBOrDesc = MemoryBuffer::getFile(SI.ModuleFilePath);
     if (!MBOrDesc)

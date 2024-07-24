@@ -100,12 +100,13 @@ if(SYCL_PI_UR_USE_FETCH_CONTENT)
   endfunction()
 
   set(UNIFIED_RUNTIME_REPO "https://github.com/oneapi-src/unified-runtime.git")
-  # commit 0abf37072567c27ff412ea7acfce7b72b9e4b3c0
+  # commit e161516663bd5d14d15532dfaba626d5cdf32ed8
+  # Merge: 47633088 febb18bb
   # Author: Kenneth Benzie (Benie) <k.benzie@codeplay.com>
-  # Date:   Wed Jul 17 19:12:31 2024 +0100
-  #     Reinstate "Merge pull request #1855 from Seanst98/sean/rename-external-semaphore-release""
-  #     This reverts commit b26e53cdbd178ee03c3e8252aa00e596deb1f313.
-  set(UNIFIED_RUNTIME_TAG 0abf37072567c27ff412ea7acfce7b72b9e4b3c0)
+  # Date:   Wed Jul 24 13:54:43 2024 +0100
+  #     Merge pull request #1521 from AllanZyne/review/yang/dg2
+  #     [DeviceSanitizer] Support GPU DG2 & GEN Device
+  set(UNIFIED_RUNTIME_TAG e161516663bd5d14d15532dfaba626d5cdf32ed8)
 
   fetch_adapter_source(level_zero
     ${UNIFIED_RUNTIME_REPO}
