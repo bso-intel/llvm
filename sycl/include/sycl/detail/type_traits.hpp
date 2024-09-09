@@ -333,6 +333,9 @@ template <typename T>
 struct is_floating_point
     : is_floating_point_impl<std::remove_cv_t<get_elem_type_t<T>>> {};
 
+template <typename T>
+constexpr bool is_floating_point_v = is_floating_point<T>::value;
+
 // is_arithmetic
 template <typename T>
 struct is_arithmetic
@@ -366,12 +369,6 @@ struct is_vector_bool
 template <typename T>
 struct is_bool
     : std::bool_constant<is_scalar_bool<vector_element_t<T>>::value> {};
-
-// is_boolean
-template <int N> struct Boolean;
-template <typename T> struct is_boolean : std::false_type {};
-template <int N> struct is_boolean<Boolean<N>> : std::true_type {};
-template <typename T> inline constexpr bool is_boolean_v = is_boolean<T>::value;
 
 // is_pointer
 template <typename T> struct is_pointer_impl : std::false_type {};
